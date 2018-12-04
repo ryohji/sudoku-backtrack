@@ -172,11 +172,11 @@ unsigned degree_of_freedom(uint16_t *cells)
     return d;
 }
 
-bool ng(uint16_t *cells);
+bool ok(uint16_t *cells);
 
 void solve(uint16_t *cells)
 {
-    if (!ng(cells))
+    if (ok(cells))
     {
         struct next n = next(cells);
         if (n.p != cells + N)
@@ -198,9 +198,9 @@ void solve(uint16_t *cells)
     }
 }
 
-bool conflict(const char *board, const unsigned *index_iterator, const unsigned *offset_iterator);
+bool acceptable(const char *board, const unsigned *index_iterator, const unsigned *offset_iterator);
 
-bool ng(uint16_t *cells)
+bool ok(uint16_t *cells)
 {
     char board[N];
     deinit(cells, board);
@@ -252,12 +252,12 @@ bool ng(uint16_t *cells)
         60,
     };
 
-    return conflict(board, r_idx, r_off) || conflict(board, c_idx, c_off) || conflict(board, b_idx, b_off);
+    return acceptable(board, r_idx, r_off) && acceptable(board, c_idx, c_off) && acceptable(board, b_idx, b_off);
 }
 
 #define min(a, b) ((a) > (b) ? (b) : (a))
 
-bool conflict(const char *board, const unsigned *index_iterator, const unsigned *offset_iterator)
+bool acceptable(const char *board, const unsigned *index_iterator, const unsigned *offset_iterator)
 {
     const unsigned *it2 = offset_iterator;
 
@@ -282,8 +282,7 @@ bool conflict(const char *board, const unsigned *index_iterator, const unsigned 
         it2 += 1;
     }
 
-    bool ok = it2 == offset_iterator + 9;
-    return !ok;
+    return it2 == offset_iterator + 9;
 }
 
 int main(int argn, const char **args)
