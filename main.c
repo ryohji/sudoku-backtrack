@@ -4,47 +4,42 @@
 #include <string.h>
 
 #define N 81
+#define min(a, b) ((a) > (b) ? (b) : (a))
+#define BITS3(x) ((unsigned[]){ \
+    0,                          \
+    1,                          \
+    1,                          \
+    2,                          \
+    1,                          \
+    2,                          \
+    2,                          \
+    3,                          \
+})[(x)&07]
+
+static const uint16_t bits[9] = {
+    1,
+    2,
+    4,
+    8,
+    16,
+    32,
+    64,
+    128,
+    256,
+};
+
+unsigned number_of_bits(const uint16_t candidates)
+{
+    return BITS3(candidates) + BITS3(candidates >> 3) + BITS3(candidates >> 6);
+}
 
 void init(const char *board, uint16_t *cells)
 {
     const char *it = board;
     while (it != board + N)
     {
-        uint16_t c;
-        switch (*it)
-        {
-        default:
-            c = 511;
-            break;
-        case '1':
-            c = 1;
-            break;
-        case '2':
-            c = 2;
-            break;
-        case '3':
-            c = 4;
-            break;
-        case '4':
-            c = 8;
-            break;
-        case '5':
-            c = 16;
-            break;
-        case '6':
-            c = 32;
-            break;
-        case '7':
-            c = 64;
-            break;
-        case '8':
-            c = 128;
-            break;
-        case '9':
-            c = 256;
-            break;
-        }
-        cells[it - board] = c;
+        const unsigned index = *it - '1';
+        cells[it - board] = index < 9 ? bits[index] : 511; // 511 is the sum of bits (i.e. all candidates).
         it += 1;
     }
 }
@@ -104,58 +99,19 @@ void dump(const uint16_t *cells)
         strncpy(line, buffer + 9 * n, 9);
         puts(line);
     }
-    fflush(stdout);
-}
-
-uint16_t *candidates(const uint16_t cell, uint16_t *buffer)
-{
-    const uint16_t bit[] = {
-        1,
-        2,
-        4,
-        8,
-        16,
-        32,
-        64,
-        128,
-        256,
-    };
-    const uint16_t *it = bit;
-    while (it != bit + 9)
-    {
-        if (*it & cell)
-        {
-            *buffer = *it;
-            buffer += 1;
-        }
-        it += 1;
-    }
-    return buffer;
 }
 
 /**
  * search next cell, which holds some candidates.
  */
-struct next
+uint16_t *next(uint16_t *cells)
 {
-    uint16_t *p;
-    unsigned n; // number of valid candidates
-    uint16_t candidates[9];
-};
-
-struct next next(uint16_t *cells)
-{
-    struct next ret = {.p = cells};
-    while (ret.p != cells + N)
+    uint16_t *it = cells;
+    while (it != cells + N && number_of_bits(*it) == 1)
     {
-        uint16_t *p = candidates(*ret.p, ret.candidates);
-        if ((ret.n = p - ret.candidates) > 1)
-        {
-            break;
-        }
-        ret.p += 1;
+        it += 1;
     }
-    return ret;
+    return it;
 }
 
 unsigned degree_of_freedom(uint16_t *cells)
@@ -164,9 +120,7 @@ unsigned degree_of_freedom(uint16_t *cells)
     uint16_t *it = cells;
     while (it != cells + N)
     {
-        uint16_t buffer[9];
-        uint16_t *p = candidates(*it, buffer);
-        d *= p - buffer;
+        d *= number_of_bits(*it);
         it += 1;
     }
     return d;
@@ -178,18 +132,21 @@ void solve(uint16_t *cells)
 {
     if (ok(cells))
     {
-        struct next n = next(cells);
-        if (n.p != cells + N)
+        uint16_t *const p = next(cells);
+        if (p != cells + N)
         {
-            uint16_t cell = *n.p; // memory
-            uint16_t *it = n.candidates;
-            while (it != n.candidates + n.n)
+            const uint16_t original = *p; // memory candidates
+            const uint16_t *it = bits;
+            while (it != bits + 9)
             {
-                *n.p = *it; // subvert cells by candidate
-                solve(cells);
+                if (original & *it)
+                {
+                    *p = *it; // subvert cell by candidate
+                    solve(cells);
+                }
                 it += 1;
             }
-            *n.p = cell; // revert to backtrack
+            *p = original; // revert to backtrack
         }
         else
         {
@@ -254,8 +211,6 @@ bool ok(uint16_t *cells)
 
     return acceptable(board, r_idx, r_off) && acceptable(board, c_idx, c_off) && acceptable(board, b_idx, b_off);
 }
-
-#define min(a, b) ((a) > (b) ? (b) : (a))
 
 bool acceptable(const char *board, const unsigned *index_iterator, const unsigned *offset_iterator)
 {
