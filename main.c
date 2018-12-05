@@ -215,24 +215,34 @@ bool acceptable(const uint16_t *cells, const unsigned *index_iterator, const uns
 
     while (it2 != offset_iterator + 9)
     {
-        uint16_t count[9] = { 0 };
+        uint16_t bitmap = 0;
         const unsigned *it1 = index_iterator;
         while (it1 != index_iterator + 9)
         {
-            const uint16_t candidate = *(cells + *it2 + *it1);
-            const uint16_t* it = bits;
-            while (it != bits + 9)
+            const uint16_t cell = *(cells + *it2 + *it1);
+            // check if this cell includes only one candidate
+            const uint16_t *it = bits;
+            while (it != bits + 9 && cell != *it)
             {
-                if (candidate == *it)
-                {
-                    count[it - bits] += 1;
-                }
                 it += 1;
             }
+
+            if (it != bits + 9)
+            {
+                if (bitmap & cell)
+                { // there is duplicate candidate
+                    break;
+                }
+                else
+                { // memory first candidate
+                    bitmap |= cell;
+                }
+            }
+
             it1 += 1;
         }
 
-        if (count[0] > 1 || count[1] > 1 || count[2] > 1 || count[3] > 1 || count[4] > 1 || count[5] > 1 || count[6] > 1 || count[7] > 1 || count[8] > 1)
+        if (it1 != index_iterator + 9)
         {
             break;
         }
