@@ -4,7 +4,6 @@
 #include <string.h>
 
 #define N 81
-#define min(a, b) ((a) > (b) ? (b) : (a))
 #define BITS3(x) ((unsigned[]){ \
     0,                          \
     1,                          \
@@ -155,102 +154,81 @@ void solve(uint16_t *cells)
     }
 }
 
-bool acceptable(const uint16_t *cells, const unsigned *index_iterator, const unsigned *offset_iterator);
+static const unsigned *constraint[27] = {
+    // constraint check index for rows
+    (unsigned[9]){0, 1, 2, 3, 4, 5, 6, 7, 8},
+    (unsigned[9]){9, 10, 11, 12, 13, 14, 15, 16, 17},
+    (unsigned[9]){18, 19, 20, 21, 22, 23, 24, 25, 26},
+    (unsigned[9]){27, 28, 29, 30, 31, 32, 33, 34, 35},
+    (unsigned[9]){36, 37, 38, 39, 40, 41, 42, 43, 44},
+    (unsigned[9]){45, 46, 47, 48, 49, 50, 51, 52, 53},
+    (unsigned[9]){54, 55, 56, 57, 58, 59, 60, 61, 62},
+    (unsigned[9]){63, 64, 65, 66, 67, 68, 69, 70, 71},
+    (unsigned[9]){72, 73, 74, 75, 76, 77, 78, 79, 80},
+    // constraint check index for columns
+    (unsigned[9]){0, 9, 18, 27, 36, 45, 54, 63, 72},
+    (unsigned[9]){1, 10, 19, 28, 37, 46, 55, 64, 73},
+    (unsigned[9]){2, 11, 20, 29, 38, 47, 56, 65, 74},
+    (unsigned[9]){3, 12, 21, 30, 39, 48, 57, 66, 75},
+    (unsigned[9]){4, 13, 22, 31, 40, 49, 58, 67, 76},
+    (unsigned[9]){5, 14, 23, 32, 41, 50, 59, 68, 77},
+    (unsigned[9]){6, 15, 24, 33, 42, 51, 60, 69, 78},
+    (unsigned[9]){7, 16, 25, 34, 43, 52, 61, 70, 79},
+    (unsigned[9]){8, 17, 26, 35, 44, 53, 62, 71, 80},
+    // constraint check index for blocks
+    (unsigned[9]){0, 1, 2, 9, 10, 11, 18, 19, 20},
+    (unsigned[9]){3, 4, 5, 12, 13, 14, 21, 22, 23},
+    (unsigned[9]){6, 7, 8, 15, 16, 17, 24, 25, 26},
+    (unsigned[9]){27, 28, 29, 36, 37, 38, 45, 46, 47},
+    (unsigned[9]){30, 31, 32, 39, 40, 41, 48, 49, 50},
+    (unsigned[9]){33, 34, 35, 42, 43, 44, 51, 52, 53},
+    (unsigned[9]){54, 55, 56, 63, 64, 65, 72, 73, 74},
+    (unsigned[9]){57, 58, 59, 66, 67, 68, 75, 76, 77},
+    (unsigned[9]){60, 61, 62, 69, 70, 71, 78, 79, 80},
+};
+
+bool acceptable(const uint16_t *cells, const unsigned *index);
 
 bool ok(uint16_t *cells)
 {
-    const unsigned r_idx[] = {
-        0,
-        1,
-        2,
-        3,
-        4,
-        5,
-        6,
-        7,
-        8,
-    };
-    const unsigned r_off[] = {
-        0,
-        9,
-        18,
-        27,
-        36,
-        45,
-        54,
-        63,
-        72,
-    };
-    const unsigned *c_idx = r_off;
-    const unsigned *c_off = r_idx;
-    const unsigned b_idx[] = {
-        0,
-        1,
-        2,
-        9,
-        10,
-        11,
-        18,
-        19,
-        20,
-    };
-    const unsigned b_off[] = {
-        0,
-        3,
-        6,
-        27,
-        30,
-        33,
-        54,
-        57,
-        60,
-    };
-
-    return acceptable(cells, r_idx, r_off) && acceptable(cells, c_idx, c_off) && acceptable(cells, b_idx, b_off);
+    const unsigned **it = constraint;
+    while (it != constraint + 27 && acceptable(cells, *it))
+    {
+        it += 1;
+    }
+    return it == constraint + 27;
 }
 
-bool acceptable(const uint16_t *cells, const unsigned *index_iterator, const unsigned *offset_iterator)
+bool acceptable(const uint16_t *cells, const unsigned *index)
 {
-    const unsigned *it2 = offset_iterator;
-
-    while (it2 != offset_iterator + 9)
+    uint16_t bitmap = 0;
+    const unsigned *it1 = index;
+    while (it1 != index + 9)
     {
-        uint16_t bitmap = 0;
-        const unsigned *it1 = index_iterator;
-        while (it1 != index_iterator + 9)
+        const uint16_t cell = *(cells + *it1);
+        // check if this cell includes only one candidate
+        const uint16_t *it = bits;
+        while (it != bits + 9 && cell != *it)
         {
-            const uint16_t cell = *(cells + *it2 + *it1);
-            // check if this cell includes only one candidate
-            const uint16_t *it = bits;
-            while (it != bits + 9 && cell != *it)
-            {
-                it += 1;
-            }
-
-            if (it != bits + 9)
-            {
-                if (bitmap & cell)
-                { // there is duplicate candidate
-                    break;
-                }
-                else
-                { // memory first candidate
-                    bitmap |= cell;
-                }
-            }
-
-            it1 += 1;
+            it += 1;
         }
 
-        if (it1 != index_iterator + 9)
+        if (it != bits + 9)
         {
-            break;
+            if (bitmap & cell)
+            { // there is duplicate candidate
+                break;
+            }
+            else
+            { // memory first candidate
+                bitmap |= cell;
+            }
         }
 
-        it2 += 1;
+        it1 += 1;
     }
 
-    return it2 == offset_iterator + 9;
+    return it1 == index + 9;
 }
 
 int main(int argn, const char **args)
