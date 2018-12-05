@@ -1,7 +1,6 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
-#include <string.h>
 
 #define N 81
 #define BITS3(x) ((unsigned[]){ \
@@ -32,6 +31,13 @@ unsigned number_of_bits(const uint16_t candidates)
     return BITS3(candidates) + BITS3(candidates >> 3) + BITS3(candidates >> 6);
 }
 
+const uint16_t *find(uint16_t value, const uint16_t *begin, const uint16_t *end)
+{
+    for (; begin != end && value != *begin; begin += 1)
+        continue;
+    return begin;
+}
+
 void init(const char *board, uint16_t *cells)
 {
     const char *it;
@@ -42,60 +48,11 @@ void init(const char *board, uint16_t *cells)
     }
 }
 
-void deinit(const uint16_t *cells, char *buffer)
+void dump(const uint16_t *cells)
 {
     const uint16_t *it;
     for (it = cells; it != cells + N; it += 1)
-    {
-        char c;
-        switch (*it)
-        {
-        default:
-            c = '*';
-            break;
-        case 1:
-            c = '1';
-            break;
-        case 2:
-            c = '2';
-            break;
-        case 4:
-            c = '3';
-            break;
-        case 8:
-            c = '4';
-            break;
-        case 16:
-            c = '5';
-            break;
-        case 32:
-            c = '6';
-            break;
-        case 64:
-            c = '7';
-            break;
-        case 128:
-            c = '8';
-            break;
-        case 256:
-            c = '9';
-            break;
-        }
-        buffer[it - cells] = c;
-    }
-}
-
-void dump(const uint16_t *cells)
-{
-    char buffer[N];
-    unsigned n;
-    deinit(cells, buffer);
-    for (n = 0; n < 9; n += 1)
-    {
-        char line[10] = {0};
-        strncpy(line, buffer + 9 * n, 9);
-        puts(line);
-    }
+        printf("%c%c", "123456789*"[find(*it, bits, bits + 9) - bits], (it - cells) % 9 == 8 ? '\n' : '\0');
 }
 
 /**
@@ -194,29 +151,20 @@ bool ok(uint16_t *cells)
 bool acceptable(const uint16_t *cells, const unsigned *index)
 {
     uint16_t bitmap = 0;
-    const unsigned *it1;
-    for (it1 = index; it1 != index + 9; it1 += 1)
-    {
-        const uint16_t cell = *(cells + *it1);
-        // check if this cell includes only one candidate
-        const uint16_t *it;
-        for (it = bits; it != bits + 9 && cell != *it; it += 1)
-            continue;
-
-        if (it != bits + 9)
-        {
-            if (bitmap & cell)
-            { // there is duplicate candidate
+    const unsigned *it;
+    for (it = index; it != index + 9; it += 1)
+        if (find(cells[*it], bits, bits + 9) != bits + 9)
+        { // the cell includes only one candidate
+            if (bitmap & cells[*it])
+            { // bitmap already marked by another cell; there is duplicate candidate
                 break;
             }
             else
             { // memory first candidate
-                bitmap |= cell;
+                bitmap |= cells[*it];
             }
         }
-    }
-
-    return it1 == index + 9;
+    return it == index + 9;
 }
 
 int main(int argn, const char **args)
