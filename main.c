@@ -34,19 +34,18 @@ unsigned number_of_bits(const uint16_t candidates)
 
 void init(const char *board, uint16_t *cells)
 {
-    const char *it = board;
-    while (it != board + N)
+    const char *it;
+    for (it = board; it != board + N; it += 1)
     {
         const unsigned index = *it - '1';
         cells[it - board] = index < 9 ? bits[index] : 511; // 511 is the sum of bits (i.e. all candidates).
-        it += 1;
     }
 }
 
 void deinit(const uint16_t *cells, char *buffer)
 {
-    const uint16_t *it = cells;
-    while (it != cells + N)
+    const uint16_t *it;
+    for (it = cells; it != cells + N; it += 1)
     {
         char c;
         switch (*it)
@@ -83,7 +82,6 @@ void deinit(const uint16_t *cells, char *buffer)
             break;
         }
         buffer[it - cells] = c;
-        it += 1;
     }
 }
 
@@ -105,22 +103,19 @@ void dump(const uint16_t *cells)
  */
 uint16_t *next(uint16_t *cells)
 {
-    uint16_t *it = cells;
-    while (it != cells + N && number_of_bits(*it) == 1)
-    {
-        it += 1;
-    }
+    uint16_t *it;
+    for (it = cells; it != cells + N && number_of_bits(*it) == 1; it += 1)
+        continue;
     return it;
 }
 
 unsigned degree_of_freedom(uint16_t *cells)
 {
     unsigned d = 1;
-    uint16_t *it = cells;
-    while (it != cells + N)
+    uint16_t *it;
+    for (it = cells; it != cells + N; it += 1)
     {
         d *= number_of_bits(*it);
-        it += 1;
     }
     return d;
 }
@@ -135,15 +130,14 @@ void solve(uint16_t *cells)
         if (p != cells + N)
         {
             const uint16_t original = *p; // memory candidates
-            const uint16_t *it = bits;
-            while (it != bits + 9)
+            const uint16_t *it;
+            for (it = bits; it != bits + 9; it += 1)
             {
                 if (original & *it)
                 {
                     *p = *it; // subvert cell by candidate
                     solve(cells);
                 }
-                it += 1;
             }
             *p = original; // revert to backtrack
         }
@@ -191,27 +185,23 @@ bool acceptable(const uint16_t *cells, const unsigned *index);
 
 bool ok(uint16_t *cells)
 {
-    const unsigned **it = constraint;
-    while (it != constraint + 27 && acceptable(cells, *it))
-    {
-        it += 1;
-    }
+    const unsigned **it;
+    for (it = constraint; it != constraint + 27 && acceptable(cells, *it); it += 1)
+        continue;
     return it == constraint + 27;
 }
 
 bool acceptable(const uint16_t *cells, const unsigned *index)
 {
     uint16_t bitmap = 0;
-    const unsigned *it1 = index;
-    while (it1 != index + 9)
+    const unsigned *it1;
+    for (it1 = index; it1 != index + 9; it1 += 1)
     {
         const uint16_t cell = *(cells + *it1);
         // check if this cell includes only one candidate
-        const uint16_t *it = bits;
-        while (it != bits + 9 && cell != *it)
-        {
-            it += 1;
-        }
+        const uint16_t *it;
+        for (it = bits; it != bits + 9 && cell != *it; it += 1)
+            continue;
 
         if (it != bits + 9)
         {
@@ -224,8 +214,6 @@ bool acceptable(const uint16_t *cells, const unsigned *index)
                 bitmap |= cell;
             }
         }
-
-        it1 += 1;
     }
 
     return it1 == index + 9;
