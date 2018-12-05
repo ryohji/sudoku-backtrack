@@ -155,13 +155,10 @@ void solve(uint16_t *cells)
     }
 }
 
-bool acceptable(const char *board, const unsigned *index_iterator, const unsigned *offset_iterator);
+bool acceptable(const uint16_t *cells, const unsigned *index_iterator, const unsigned *offset_iterator);
 
 bool ok(uint16_t *cells)
 {
-    char board[N];
-    deinit(cells, board);
-
     const unsigned r_idx[] = {
         0,
         1,
@@ -209,27 +206,33 @@ bool ok(uint16_t *cells)
         60,
     };
 
-    return acceptable(board, r_idx, r_off) && acceptable(board, c_idx, c_off) && acceptable(board, b_idx, b_off);
+    return acceptable(cells, r_idx, r_off) && acceptable(cells, c_idx, c_off) && acceptable(cells, b_idx, b_off);
 }
 
-bool acceptable(const char *board, const unsigned *index_iterator, const unsigned *offset_iterator)
+bool acceptable(const uint16_t *cells, const unsigned *index_iterator, const unsigned *offset_iterator)
 {
     const unsigned *it2 = offset_iterator;
 
     while (it2 != offset_iterator + 9)
     {
-        const char *p = board + *it2;
-
-        unsigned bits[10] = {0};
+        uint16_t count[9] = { 0 };
         const unsigned *it1 = index_iterator;
         while (it1 != index_iterator + 9)
         {
-            unsigned i = p[*it1] - '1';
-            bits[min(i, 9)] += 1;
+            const uint16_t candidate = *(cells + *it2 + *it1);
+            const uint16_t* it = bits;
+            while (it != bits + 9)
+            {
+                if (candidate == *it)
+                {
+                    count[it - bits] += 1;
+                }
+                it += 1;
+            }
             it1 += 1;
         }
 
-        if (bits[0] > 1 || bits[1] > 1 || bits[2] > 1 || bits[3] > 1 || bits[4] > 1 || bits[5] > 1 || bits[6] > 1 || bits[7] > 1 || bits[8] > 1)
+        if (count[0] > 1 || count[1] > 1 || count[2] > 1 || count[3] > 1 || count[4] > 1 || count[5] > 1 || count[6] > 1 || count[7] > 1 || count[8] > 1)
         {
             break;
         }
