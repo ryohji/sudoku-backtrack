@@ -3,16 +3,28 @@
 #include <stdio.h>
 
 #define N 81
-#define BITS3(x) ((unsigned[]){ \
-    0,                          \
-    1,                          \
-    1,                          \
-    2,                          \
-    1,                          \
-    2,                          \
-    2,                          \
-    3,                          \
-})[(x)&07]
+
+void init(const char *board, uint16_t *cells);
+void solve(uint16_t *cells);
+
+int main(int argn, const char **args)
+{
+    uint16_t cells[N];
+
+    init("*6*41*83*"
+         "7**8*****"
+         "5*19*****"
+         "*******7*"
+         "6*9***5*4"
+         "*1*******"
+         "*****47*9"
+         "*****8**1"
+         "*78*39*6*",
+         cells);
+    solve(cells);
+
+    return 0;
+}
 
 static const uint16_t bits[9] = {
     1,
@@ -26,18 +38,6 @@ static const uint16_t bits[9] = {
     256,
 };
 
-unsigned number_of_bits(const uint16_t candidates)
-{
-    return BITS3(candidates) + BITS3(candidates >> 3) + BITS3(candidates >> 6);
-}
-
-const uint16_t *find(uint16_t value, const uint16_t *begin, const uint16_t *end)
-{
-    for (; begin != end && value != *begin; begin += 1)
-        continue;
-    return begin;
-}
-
 void init(const char *board, uint16_t *cells)
 {
     const char *it;
@@ -48,36 +48,9 @@ void init(const char *board, uint16_t *cells)
     }
 }
 
-void dump(const uint16_t *cells)
-{
-    const uint16_t *it;
-    for (it = cells; it != cells + N; it += 1)
-        printf("%c%c", "123456789*"[find(*it, bits, bits + 9) - bits], (it - cells) % 9 == 8 ? '\n' : '\0');
-}
-
-/**
- * search next cell, which holds some candidates.
- */
-uint16_t *next(uint16_t *cells)
-{
-    uint16_t *it;
-    for (it = cells; it != cells + N && number_of_bits(*it) == 1; it += 1)
-        continue;
-    return it;
-}
-
-unsigned degree_of_freedom(uint16_t *cells)
-{
-    unsigned d = 1;
-    uint16_t *it;
-    for (it = cells; it != cells + N; it += 1)
-    {
-        d *= number_of_bits(*it);
-    }
-    return d;
-}
-
 bool ok(uint16_t *cells);
+uint16_t *next(uint16_t *cells);
+void dump(const uint16_t *cells);
 
 void solve(uint16_t *cells)
 {
@@ -148,6 +121,8 @@ bool ok(uint16_t *cells)
     return it == constraint + 27;
 }
 
+const uint16_t *find(uint16_t value, const uint16_t *begin, const uint16_t *end);
+
 bool acceptable(const uint16_t *cells, const unsigned *index)
 {
     uint16_t bitmap = 0;
@@ -167,21 +142,39 @@ bool acceptable(const uint16_t *cells, const unsigned *index)
     return it == index + 9;
 }
 
-int main(int argn, const char **args)
+const uint16_t *find(uint16_t value, const uint16_t *begin, const uint16_t *end)
 {
-    uint16_t cells[N];
+    for (; begin != end && value != *begin; begin += 1)
+        continue;
+    return begin;
+}
 
-    init("*6*41*83*"
-         "7**8*****"
-         "5*19*****"
-         "*******7*"
-         "6*9***5*4"
-         "*1*******"
-         "*****47*9"
-         "*****8**1"
-         "*78*39*6*",
-         cells);
-    solve(cells);
+#define BITS3(x) ((unsigned[]){ \
+    0,                          \
+    1,                          \
+    1,                          \
+    2,                          \
+    1,                          \
+    2,                          \
+    2,                          \
+    3,                          \
+})[(x)&07]
+#define number_of_bits(candidates) (BITS3(candidates) + BITS3(candidates >> 3) + BITS3(candidates >> 6))
 
-    return 0;
+/**
+ * search next cell, which holds some candidates.
+ */
+uint16_t *next(uint16_t *cells)
+{
+    uint16_t *it;
+    for (it = cells; it != cells + N && number_of_bits(*it) == 1; it += 1)
+        continue;
+    return it;
+}
+
+void dump(const uint16_t *cells)
+{
+    const uint16_t *it;
+    for (it = cells; it != cells + N; it += 1)
+        printf("%c%c", "123456789*"[find(*it, bits, bits + 9) - bits], (it - cells) % 9 == 8 ? '\n' : '\0');
 }
