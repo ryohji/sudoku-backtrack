@@ -47,30 +47,18 @@ struct list *grow(struct list *list)
     return nexts;
 }
 
-static bool prune_violates(void *context, void *value);
+static bool follows_constraints(void *context, void *value);
 
 struct list *prune(struct list *lists)
 {
-    return list_filter(lists, prune_violates, NULL);
+    return list_filter(lists, follows_constraints, NULL);
 }
 
-static void *column_number(void *context, void *value)
-{
-    return (void *)(((unsigned long)value) % 9);
-}
+static void *column_number(void *context, void *value);
+static void *block_number(void *context, void *value);
+static bool eq(void *context, void *value);
 
-static void *block_number(void *context, void *value)
-{
-    unsigned long index = (unsigned long)value;
-    return (void *)(index / 3 % 3 + index / 27 * 3);
-}
-
-static bool eq(void *context, void *value)
-{
-    return context == value;
-}
-
-bool prune_violates(void *context, void *list)
+bool follows_constraints(void *context, void *list)
 {
     unsigned const N = list_length(list);
     if (N == 0 || N == 1)
@@ -90,6 +78,22 @@ bool prune_violates(void *context, void *list)
             return false;
         }
     }
+}
+
+void *column_number(void *context, void *value)
+{
+    return (void *)(((unsigned long)value) % 9);
+}
+
+void *block_number(void *context, void *value)
+{
+    unsigned long index = (unsigned long)value;
+    return (void *)(index / 3 % 3 + index / 27 * 3);
+}
+
+bool eq(void *context, void *value)
+{
+    return context == value;
 }
 
 static void *append(void *context, void *aggregate, void *list);
