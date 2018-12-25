@@ -16,7 +16,7 @@ int main()
     return 0;
 }
 
-static struct list *grow(struct list *list);
+static struct list *candidates(struct list *list);
 static struct list *prune(struct list *lists);
 static struct list *concat(struct list *lists);
 
@@ -28,14 +28,14 @@ void *generate(void *context, void *list)
     }
     else
     {
-        struct list *nexts = grow(list);
+        struct list *nexts = candidates(list);
         struct list *filtered = prune(nexts);
-        struct list *lists = list_map(filtered, generate, NULL);
+        struct list *lists = list_map(filtered, generate, context);
         return concat(lists);
     }
 }
 
-struct list *grow(struct list *list)
+struct list *candidates(struct list *list)
 {
     struct list *nexts = list_make(NULL, 0);
     unsigned const N = list_length(list);
@@ -54,30 +54,29 @@ struct list *prune(struct list *lists)
     return list_filter(lists, follows_constraints, NULL);
 }
 
+static bool no_duplicate(void *(*constraints)(void *context, void *value), struct list *list, void *context);
 static void *column_number(void *context, void *value);
 static void *block_number(void *context, void *value);
-static bool eq(void *context, void *value);
 
 bool follows_constraints(void *context, void *list)
 {
-    unsigned const N = list_length(list);
-    if (N == 0 || N == 1)
+    switch (list_length(list))
     {
+    case 0:
+    case 1:
         return true;
+    default:
+        return no_duplicate(column_number, list, context) && no_duplicate(block_number, list, context);
     }
-    else
-    {
-        struct list *column = list_map(list, column_number, NULL);
-        if (list_length(list_filter(column, eq, list_value(column, N - 1))) == 1)
-        {
-            struct list *block = list_map(list, block_number, NULL);
-            return list_length(list_filter(block, eq, list_value(block, N - 1))) == 1;
-        }
-        else
-        {
-            return false;
-        }
-    }
+}
+
+static bool eq(void *context, void *value);
+
+bool no_duplicate(void *(*group)(void *context, void *value), struct list *list, void *context)
+{
+    struct list *number = list_map(list, group, context);
+    void *the_last = list_value(number, list_length(number) - 1);
+    return list_length(list_filter(number, eq, the_last)) == 1;
 }
 
 void *column_number(void *context, void *value)
