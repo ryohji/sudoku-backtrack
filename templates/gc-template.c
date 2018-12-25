@@ -54,6 +54,22 @@ struct list *prune(struct list *lists)
     return list_filter(lists, prune_violates, NULL);
 }
 
+static void *column_number(void *context, void *value)
+{
+    return (void *)(((unsigned long)value) % 9);
+}
+
+static void *block_number(void *context, void *value)
+{
+    unsigned long index = (unsigned long)value;
+    return (void *)(index / 3 % 3 + index / 27 * 3);
+}
+
+static bool eq(void *context, void *value)
+{
+    return context == value;
+}
+
 bool prune_violates(void *context, void *list)
 {
     unsigned const N = list_length(list);
@@ -63,9 +79,16 @@ bool prune_violates(void *context, void *list)
     }
     else
     {
-        unsigned x = (unsigned long) list_value(list, N - 1);
-        // todo filter obeys column and block constraints.
-        return false;
+        struct list *column = list_map(list, column_number, NULL);
+        if (list_length(list_filter(column, eq, list_value(column, N - 1))) == 1)
+        {
+            struct list *block = list_map(list, block_number, NULL);
+            return list_length(list_filter(block, eq, list_value(block, N - 1))) == 1;
+        }
+        else
+        {
+            return false;
+        }
     }
 }
 
