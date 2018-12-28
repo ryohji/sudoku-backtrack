@@ -25,7 +25,7 @@ int main()
 
 static struct list *candidates(struct list *list);
 static struct list *prune(struct list *lists);
-static struct list *concat(struct list *lists);
+static struct list *flatten(struct list *lists);
 
 void *generate(void *context, void *list)
 {
@@ -38,7 +38,7 @@ void *generate(void *context, void *list)
         struct list *nexts = candidates(list);
         struct list *filtered = prune(nexts);
         struct list *lists = list_map(filtered, generate, context);
-        return concat(lists);
+        return flatten(lists);
     }
 }
 
@@ -108,14 +108,14 @@ bool eq(void *context, void *value)
     return as_number(context) == as_number(value);
 }
 
-static void *append(void *context, void *aggregate, void *list);
+static void *concat(void *context, void *aggregate, void *list);
 
-struct list *concat(struct list *lists)
+struct list *flatten(struct list *lists)
 {
-    return list_reduce(lists, list_make(NULL, 0), append, NULL);
+    return list_reduce(lists, list_make(NULL, 0), concat, NULL);
 }
 
-void *append(void *context, void *aggregate, void *list)
+void *concat(void *context, void *aggregate, void *list)
 {
     return list_concatenate(aggregate, list);
 }
