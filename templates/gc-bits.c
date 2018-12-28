@@ -21,7 +21,7 @@ struct bits
 
 struct bits *bits_make(unsigned nr_bits)
 {
-    struct bits *bits = GC_MALLOC(sizeof(bits) + WSIZE * nr_word_for(nr_bits));
+    struct bits *bits = GC_MALLOC(sizeof(struct bits) + WSIZE * nr_word_for(nr_bits));
     bits->n = nr_bits;
     return bits;
 }
@@ -65,12 +65,14 @@ char *bits_serialize(const struct bits *bits)
     {
         *(p + bits->n - 1 - n) = bits_get(bits, n) ? '1' : '0';
     }
+    p[n] = '\0';
     return p;
 }
 
 struct bits *bits_set(const struct bits *bits, unsigned index, bool set)
 {
     struct bits *copy = bits_make(bits->n);
+    memcpy(copy->data, bits->data, WSIZE * nr_word_for(bits->n));
     bits_set_(copy->data, index, set);
     return copy;
 }
