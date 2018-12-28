@@ -70,24 +70,39 @@ struct pair
     void *second;
 };
 
-static void *map_fn(void *context, void *aggregate, void *value)
-{
-    void *(*map)(void *context, void *value) = ((struct pair *)context)->second;
-    return list_append(aggregate, map(((struct pair *)context)->first, value));
-}
+static struct list *reduce_aux(const struct list *list, void *(*reduce_fn)(void *, void *, void*), struct pair pair);
+static void *map_fn(void *pair, void *place, void *value);
+static void *filter_fn(void *pair, void *place, void *value);
 
 struct list *list_map(const struct list *list, void *(*f)(void *context, void *value), void *context)
 {
-    return list_reduce(list, list_make(0, 0), map_fn, &(struct pair){.first = context, .second = f});
-}
-
-static void *filter_fn(void *context, void *aggregate, void *value)
-{
-    bool (*filter)(void *context, void *value) = ((struct pair *)context)->second;
-    return filter(((struct pair *)context)->first, value) ? list_append(aggregate, value) : aggregate;
+    return reduce_aux(list, map_fn, (struct pair){.first = context, .second = f});
 }
 
 struct list *list_filter(const struct list *list, bool (*f)(void *context, void *value), void *context)
 {
-    return list_reduce(list, list_make(0, 0), filter_fn, &(struct pair){.first = context, .second = f});
+    return reduce_aux(list, filter_fn, (struct pair){.first = context, .second = f});
+}
+
+struct list *reduce_aux(const struct list *list, void *(*reduce_fn)(void *, void *, void*), struct pair pair)
+{
+    void **begin = GC_MALLOC(list_length(list) * sizeof(void *));
+    void **end = list_reduce(list, begin, reduce_fn, &pair);
+    return list_make(begin, end - begin);
+}
+
+void *map_fn(void *pair, void *place, void *value)
+{
+    void *context = ((struct pair *)pair)->first;
+    void *(*f)(void *, void *) = ((struct pair *)pair)->second;
+    *((void **)place) = f(context, value);
+    return ((void **)place) + 1;
+}
+
+void *filter_fn(void *pair, void *place, void *value)
+{
+    void *context = ((struct pair *)pair)->first;
+    bool (*f)(void *, void *) = ((struct pair *)pair)->second;
+    *((void **)place) = value;
+    return ((void **)place) + f(context, value);
 }
