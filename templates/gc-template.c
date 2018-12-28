@@ -44,14 +44,21 @@ void *generate(void *context, void *list)
 
 struct list *candidates(struct list *list)
 {
-    struct list *nexts = list_make(NULL, 0);
+    /* make {list ++ [9N], list ++ [9N+1], ..., list ++ [9N+8]} */
     unsigned const N = list_length(list);
-    unsigned n;
-    for (n = 0; n != 9; n += 1)
-    {
-        nexts = list_append(nexts, list_append(list, number_make(N * 9 + n)));
-    }
-    return nexts;
+    void *ns[9] = {
+        number_make(9 * N + 0),
+        number_make(9 * N + 1),
+        number_make(9 * N + 2),
+        number_make(9 * N + 3),
+        number_make(9 * N + 4),
+        number_make(9 * N + 5),
+        number_make(9 * N + 6),
+        number_make(9 * N + 7),
+        number_make(9 * N + 8),
+    };
+    void *(*const prepend)(void *, void*) = (void *)list_append;
+    return list_map(list_make(ns, 9), prepend, list);
 }
 
 static bool follows_constraints(void *context, void *value);
