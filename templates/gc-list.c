@@ -36,6 +36,14 @@ struct list *list_append(const struct list *list, void *value)
     return new;
 }
 
+struct list *list_concatenate(const struct list *a, const struct list *b)
+{
+    struct list *list = create(a->n + b->n);
+    memcpy(head_of(list), a->vs, a->n * sizeof(void *));
+    memcpy(head_of(list) + a->n, b->vs, b->n * sizeof(void *));
+    return list;
+}
+
 void *list_reduce(const struct list *list, void *aggregate, void *(*f)(void *context, void *aggregate, void *value), void *context)
 {
     void *const *it;

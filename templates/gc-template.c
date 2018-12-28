@@ -117,12 +117,7 @@ struct list *concat(struct list *lists)
 
 void *append(void *context, void *aggregate, void *list)
 {
-    unsigned n;
-    for (n = 0; n != list_length(list); n += 1)
-    {
-        aggregate = list_append(aggregate, list_value(list, n));
-    }
-    return aggregate;
+    return list_concatenate(aggregate, list);
 }
 
 void *number_make(unsigned value)
