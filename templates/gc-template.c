@@ -15,12 +15,31 @@ static void *number_make(unsigned value);
 // interpret value object as unsigned number
 static unsigned as_number(void *value);
 
+// print out given template.
+static void *dump_template(void *context, void *list);
+
 int main()
 {
     GC_INIT();
     struct list *templates = generate(NULL, list_make(NULL, 0));
-    printf("%u\n", list_length(templates));
+    list_map(templates, dump_template, stdout);
+    fflush(stdout);
     return 0;
+}
+
+static void *dump_number(void *context, void *value);
+
+void *dump_template(void *context, void *list)
+{
+    list_map(list, dump_number, context);
+    fprintf(context, "\n");
+    return list;
+}
+
+void *dump_number(void *context, void *value)
+{
+    fprintf(context, "%u ", as_number(value));
+    return value;
 }
 
 static struct list *candidates(struct list *list);
