@@ -6,23 +6,33 @@
 struct list
 {
     unsigned n;
-    void *const vs[0];
+    void *vs[0];
 };
 
-struct list *list_make(void *const *values, unsigned elems)
+static struct list *create(unsigned elems)
 {
     struct list *const list = GC_MALLOC(sizeof(struct list) + elems * sizeof(void *));
     list->n = elems;
-    memcpy((void **)list->vs, values, elems * sizeof(void *));
+    return list;
+}
+
+static void **head_of(struct list *list)
+{
+    return list->vs;
+}
+
+struct list *list_make(void *const *values, unsigned elems)
+{
+    struct list *const list = create(elems);
+    memcpy(head_of(list), values, elems * sizeof(void *));
     return list;
 }
 
 struct list *list_append(const struct list *list, void *value)
 {
-    struct list *new = GC_MALLOC(sizeof(struct list) + (list->n + 1) * sizeof(void *));
-    new->n = list->n + 1;
-    memcpy((void **)new->vs, list->vs, list->n * sizeof(void *));
-    ((void **)new->vs)[list->n] = value;
+    struct list *new = create(list->n + 1);
+    memcpy(head_of(new), list->vs, list->n * sizeof(void *));
+    memcpy(head_of(new) + list->n, &value, sizeof(void *));
     return new;
 }
 
