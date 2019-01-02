@@ -136,10 +136,8 @@ void *print_tagged(void *context, void *value)
     unsigned *it;
     for (it = decomposed_array(decomp); it != decomposed_array(decomp) + decomposed_size(decomp); it += 1)
     {
-        printf("%u ", *it);
         string[*it] = n + '0';
     }
-    puts("");
     return NULL;
 }
 
