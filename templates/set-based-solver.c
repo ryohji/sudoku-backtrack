@@ -15,6 +15,11 @@ struct set *set_intersection(const struct set *a, const struct set *b);
 // test if set B is the subset of set A.
 bool set_subset(const struct set *a, const struct set *b);
 
+// return the array object which having numbers in the specified set.
+void *set_decompose(const struct set *set);
+unsigned decomposed_size(void *decomposed);
+unsigned *decomposed_array(void *decomposed);
+
 struct list *fread_templates(FILE *fp);
 
 void solve(struct list *templates, const char *sudoku);
@@ -268,6 +273,39 @@ struct set *set_difference(const struct set *a, const struct set *b)
 bool set_subset(const struct set *a, const struct set *b)
 {
     return bits_count((void *)set_difference(b, a)) == 0;
+}
+
+struct decomposed
+{
+    unsigned n;
+    unsigned vs[0];
+};
+
+void *set_decompose(const struct set *set)
+{
+    const void *bits = set;
+    const unsigned n = bits_count(bits);
+    struct decomposed *p = GC_MALLOC_ATOMIC(sizeof(struct decomposed) + sizeof(unsigned) * n);
+    p->n = n;
+    unsigned i = 0;
+    unsigned *it = p->vs;
+    while (it != p->vs + n)
+    {
+        while (!bits_get(bits, i))
+            i += 1;
+        *it++ = i;
+    }
+    return p;
+}
+
+unsigned decomposed_size(void *decomposed)
+{
+    return ((struct decomposed *)decomposed)->n;
+}
+
+unsigned *decomposed_array(void *decomposed)
+{
+    return ((struct decomposed *)decomposed)->vs;
 }
 
 struct array
