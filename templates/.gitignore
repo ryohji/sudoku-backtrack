@@ -1,7 +1,7 @@
 # targets
 
 gc-template
-set
+set-based-solver
 
 gc-bits-test
 gc-list-test
