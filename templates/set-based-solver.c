@@ -49,22 +49,43 @@ static void *tagged_make(void *tag, void *value);
 static void *tagged_tag(void *tagged);
 static void *tagged_value(void *tagged);
 
-bool subset(void *placed, void *template)
+static void *nexts_make(void *to_be_fixed, void *fixed);
+
+void *solve_aux(void *context, void *value)
 {
-    return set_subset(template, placed);
+    void *to_be_fixed = pair_1st(value);
+    void *fixed = pair_2nd(value);
+    return list_length(to_be_fixed) == 0
+               ? list_make(&fixed, 1)                                                   // solved branch
+               : flatten(list_map(nexts_make(to_be_fixed, fixed), solve_aux, context)); // recursive search
 }
 
-static bool no_intersection(void *target, void *value);
+static void *next_pair(void *context, void *candidate);
 
-void *mk_candidates(void *context, void *placed)
+struct triple
 {
-    struct list *templates = pair_1st(context);
-    struct set *all = pair_2nd(context);
-    struct list *subsets = list_filter(templates, subset, placed);
-    return list_filter(subsets, no_intersection, set_difference(all, placed));
+    void *const tag, *const fixed, *const to_be_fixed;
+};
+
+static void *choose(void *context, void *pair, void *value);
+
+void *nexts_make(void *to_be_fixed, void *fixed)
+{
+    void *const choosen = list_reduce(to_be_fixed, NULL, choose, NULL); // choose minimum list
+    void *const fixing = pair_1st(choosen);
+    void *const delayed = pair_2nd(choosen);
+    void *const tag = tagged_tag(fixing);
+    void *const candidates = tagged_value(fixing);
+    return list_map(candidates, next_pair, &(struct triple){.tag = tag, .fixed = fixed, .to_be_fixed = delayed});
 }
 
-void *next_fn(void *context, void *pair, void *value)
+/**
+ * reduce function: to choose the tagged list which length is minimum.
+ * 
+ * at first, create a pair of (tagged-list, empty-list).
+ * 2nd time and later, compare the length of pair's first list and passing value's, and return a pair (lesser, cons(list, major)).
+ */
+void *choose(void *context, void *pair, void *value)
 {
     if (pair == NULL)
     {
@@ -80,40 +101,26 @@ void *next_fn(void *context, void *pair, void *value)
     }
 }
 
-bool no_intersection(void *target, void *value)
+static void *strip_having_intersectoin(void *target, void *value);
+
+void *next_pair(void *context, void *candidate)
 {
-    return set_subset(set_make(NULL, 0), set_intersection(target, value));
+    struct triple *const p = context;
+    void *const fixed = list_append(p->fixed, tagged_make(p->tag, candidate));
+    void *const to_be_fixed = list_map(p->to_be_fixed, strip_having_intersectoin, candidate);
+    return pair_make(to_be_fixed, fixed);
 }
+
+static bool no_intersection(void *target, void *value);
 
 void *strip_having_intersectoin(void *target, void *value)
 {
     return tagged_make(tagged_tag(value), list_filter(tagged_value(value), no_intersection, target));
 }
 
-void *solve_aux(void *result, void *remainder)
+bool no_intersection(void *target, void *value)
 {
-    if (list_length(remainder) == 0)
-    {
-        return list_make(&result, 1);
-    }
-    else
-    {
-        void *next = list_reduce(remainder, NULL, next_fn, NULL);
-        void *least = pair_1st(next);
-        void *tagged_remainder = pair_2nd(next);
-
-        void *const tag = tagged_tag(least);
-        void *const candidates = tagged_value(least);
-        void *nexts[list_length(candidates)];
-        unsigned n;
-        for (n = 0; n < list_length(candidates); n += 1)
-        {
-            void *candidate = list_value(candidates, n);
-            void *shrinked = list_map(tagged_remainder, strip_having_intersectoin, candidate);
-            nexts[n] = solve_aux(list_append(result, tagged_make(tag, candidate)), shrinked);
-        }
-        return flatten(list_make(nexts, n));
-    }
+    return set_subset(set_make(NULL, 0), set_intersection(target, value));
 }
 
 void *print_tagged(void *context, void *value)
@@ -128,17 +135,9 @@ void *print_list_of_tagged(void *context, void *value)
     return NULL;
 }
 
-void *zip_with_tag(void *context, void *aggregate, void *value)
-{
-    unsigned *p = context;
-    *p += 1;
-    return list_append(aggregate, tagged_make(number_make(*p), value));
-}
-
-void *union_fn(void *context, void *aggregate, void *value)
-{
-    return set_union(aggregate, value);
-}
+static void *union_fn(void *context, void *aggregate, void *value);
+static void *mk_candidates(void *context, void *placed);
+static void *zip_with_tag(void *context, void *aggregate, void *value);
 
 void solve(struct list *templates, const char *sudoku)
 {
@@ -169,11 +168,38 @@ void solve(struct list *templates, const char *sudoku)
     struct set *all = list_reduce(index, set_make(NULL, 0), union_fn, NULL);
     struct list *candidates = list_map(index, mk_candidates, pair_make(templates, all));
     struct list *tagged_candidates = list_reduce(candidates, list_make(NULL, 0), zip_with_tag, (unsigned[1]){0});
-    struct list *result = solve_aux(list_make(NULL, 0), tagged_candidates);
+    struct list *results = solve_aux(NULL, pair_make(tagged_candidates, list_make(NULL, 0)));
 
-    list_map(result, print_list_of_tagged, NULL);
+    list_map(results, print_list_of_tagged, NULL);
 
     fflush(stdout);
+}
+
+void *union_fn(void *context, void *aggregate, void *value)
+{
+    return set_union(aggregate, value);
+}
+
+static bool subset(void *placed, void *template);
+
+void *mk_candidates(void *context, void *placed)
+{
+    struct list *templates = pair_1st(context);
+    struct set *all = pair_2nd(context);
+    struct list *subsets = list_filter(templates, subset, placed);
+    return list_filter(subsets, no_intersection, set_difference(all, placed));
+}
+
+bool subset(void *placed, void *template)
+{
+    return set_subset(template, placed);
+}
+
+void *zip_with_tag(void *context, void *aggregate, void *value)
+{
+    unsigned *p = context;
+    *p += 1;
+    return list_append(aggregate, tagged_make(number_make(*p), value));
 }
 
 struct set *fread_set(FILE *fp);
