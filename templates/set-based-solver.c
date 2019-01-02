@@ -130,14 +130,25 @@ bool no_intersection(void *target, void *value)
 
 void *print_tagged(void *context, void *value)
 {
-    printf("%u %s\n", as_number(tagged_tag(value)), bits_serialize(tagged_value(value)));
+    char *string = context;
+    unsigned const n = as_number(tagged_tag(value));
+    void *const decomp = set_decompose(tagged_value(value));
+    unsigned *it;
+    for (it = decomposed_array(decomp); it != decomposed_array(decomp) + decomposed_size(decomp); it += 1)
+    {
+        printf("%u ", *it);
+        string[*it] = n + '0';
+    }
+    puts("");
     return NULL;
 }
 
 void *print_list_of_tagged(void *context, void *value)
 {
-    list_map(value, print_tagged, context);
-    return NULL;
+    char *string = GC_MALLOC_ATOMIC(82);
+    string[81] = '\0';
+    list_map(value, print_tagged, string);
+    return string;
 }
 
 static void *union_fn(void *context, void *aggregate, void *value);
@@ -175,7 +186,9 @@ void solve(struct list *templates, const char *sudoku)
     struct list *tagged_candidates = list_reduce(candidates, list_make(NULL, 0), zip_with_tag, (unsigned[1]){0});
     struct list *results = solve_aux(NULL, pair_make(tagged_candidates, list_make(NULL, 0)));
 
-    list_map(results, print_list_of_tagged, NULL);
+    struct list *strings = list_map(results, print_list_of_tagged, NULL);
+
+    puts(list_value(strings, 0)); // TODO
 
     fflush(stdout);
 }
@@ -293,7 +306,7 @@ void *set_decompose(const struct set *set)
     {
         while (!bits_get(bits, i))
             i += 1;
-        *it++ = i;
+        *it++ = i++;
     }
     return p;
 }
