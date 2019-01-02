@@ -42,92 +42,42 @@ static void *number_make(unsigned value);
 static unsigned as_number(void *value);
 static struct list *flatten(struct list *lists);
 
-struct pair
-{
-    void *first;
-    void *second;
-};
+static void *pair_make(void *first, void *second);
+static void *pair_1st(void *pair);
+static void *pair_2nd(void *pair);
+static void *tagged_make(void *tag, void *value);
+static void *tagged_tag(void *tagged);
+static void *tagged_value(void *tagged);
 
-bool pass(void *context, void *value)
+bool subset(void *placed, void *template)
 {
-    struct set *placed = ((struct pair *)context)->first;
-    if (set_subset(value, placed))
+    return set_subset(template, placed);
+}
+
+static bool no_intersection(void *target, void *value);
+
+void *mk_candidates(void *context, void *placed)
+{
+    struct list *templates = pair_1st(context);
+    struct set *all = pair_2nd(context);
+    struct list *subsets = list_filter(templates, subset, placed);
+    return list_filter(subsets, no_intersection, set_difference(all, placed));
+}
+
+void *next_fn(void *context, void *pair, void *value)
+{
+    if (pair == NULL)
     {
-        struct set *all = ((struct pair *)context)->second;
-        struct set *intersection = set_intersection(set_difference(all, placed), value);
-        return set_subset(set_make(NULL, 0), intersection);
+        return pair_make(value, list_make(NULL, 0));
     }
     else
     {
-        return false;
+        void *fewer = pair_1st(pair);
+        void *mores = pair_2nd(pair);
+        return list_length(tagged_value(value)) < list_length(tagged_value(fewer))
+                   ? pair_make(value, list_append(mores, fewer))
+                   : pair_make(fewer, list_append(mores, value));
     }
-}
-
-void *union_fn(void *context, void *aggregate, void *value)
-{
-    return set_union(aggregate, value);
-}
-
-void *mk_candidates(void *context, void *value)
-{
-    struct list *templates = ((struct pair *)context)->first;
-    struct list *all = ((struct pair *)context)->second;
-    return list_filter(templates, pass, &(struct pair){.first = value, .second = all});
-}
-
-void *pair_make(void *first, void *second)
-{
-    struct pair *p = GC_MALLOC(sizeof(struct pair));
-    p->first = first;
-    p->second = second;
-    return p;
-}
-
-void *pair_1st(void *pair)
-{
-    return ((struct pair *)pair)->first;
-}
-
-void *pair_2nd(void *pair)
-{
-    return ((struct pair *)pair)->second;
-}
-
-void *tagged_make(void *tag, void *value)
-{
-    return pair_make(tag, value);
-}
-
-void *tagged_tag(void *tagged)
-{
-    return pair_1st(tagged);
-}
-
-void *tagged_value(void *tagged)
-{
-    return pair_2nd(tagged);
-}
-
-void *next_fn(void *context, void *aggregate, void *value)
-{
-    struct pair *pair = aggregate;
-    if (pair->first == NULL)
-    {
-        pair->first = value;
-    }
-    else
-    {
-        if (list_length(tagged_value(value)) < list_length(tagged_value(pair->first)))
-        {
-            pair->second = list_append(pair->second, pair->first);
-            pair->first = value;
-        }
-        else
-        {
-            pair->second = list_append(pair->second, value);
-        }
-    }
-    return pair;
 }
 
 bool no_intersection(void *target, void *value)
@@ -148,12 +98,12 @@ void *solve_aux(void *result, void *remainder)
     }
     else
     {
-        struct pair *next = list_reduce(remainder, pair_make(NULL, list_make(NULL, 0)), next_fn, NULL);
-        struct pair *tagged_candidates = pair_1st(next);
-        struct list *tagged_remainder = pair_2nd(next);
+        void *next = list_reduce(remainder, NULL, next_fn, NULL);
+        void *least = pair_1st(next);
+        void *tagged_remainder = pair_2nd(next);
 
-        void *const tag = tagged_tag(tagged_candidates);
-        struct list *const candidates = tagged_value(tagged_candidates);
+        void *const tag = tagged_tag(least);
+        void *const candidates = tagged_value(least);
         void *nexts[list_length(candidates)];
         unsigned n;
         for (n = 0; n < list_length(candidates); n += 1)
@@ -185,6 +135,11 @@ void *zip_with_tag(void *context, void *aggregate, void *value)
     return list_append(aggregate, tagged_make(number_make(*p), value));
 }
 
+void *union_fn(void *context, void *aggregate, void *value)
+{
+    return set_union(aggregate, value);
+}
+
 void solve(struct list *templates, const char *sudoku)
 {
     unsigned is[81];
@@ -212,7 +167,7 @@ void solve(struct list *templates, const char *sudoku)
     };
     struct list *index = list_make(ss, 9);
     struct set *all = list_reduce(index, set_make(NULL, 0), union_fn, NULL);
-    struct list *candidates = list_map(index, mk_candidates, &(struct pair){.first = templates, .second = all});
+    struct list *candidates = list_map(index, mk_candidates, pair_make(templates, all));
     struct list *tagged_candidates = list_reduce(candidates, list_make(NULL, 0), zip_with_tag, (unsigned[1]){0});
     struct list *result = solve_aux(list_make(NULL, 0), tagged_candidates);
 
@@ -343,4 +298,43 @@ struct list *flatten(struct list *lists)
 void *concat(void *context, void *aggregate, void *list)
 {
     return list_concatenate(aggregate, list);
+}
+
+struct pair
+{
+    void *first;
+    void *second;
+};
+
+void *pair_make(void *first, void *second)
+{
+    struct pair *p = GC_MALLOC(sizeof(struct pair));
+    p->first = first;
+    p->second = second;
+    return p;
+}
+
+void *pair_1st(void *pair)
+{
+    return ((struct pair *)pair)->first;
+}
+
+void *pair_2nd(void *pair)
+{
+    return ((struct pair *)pair)->second;
+}
+
+void *tagged_make(void *tag, void *value)
+{
+    return pair_make(tag, value);
+}
+
+void *tagged_tag(void *tagged)
+{
+    return pair_1st(tagged);
+}
+
+void *tagged_value(void *tagged)
+{
+    return pair_2nd(tagged);
 }
