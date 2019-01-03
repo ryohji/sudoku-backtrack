@@ -274,21 +274,16 @@ bool set_subset(const struct set *a, const struct set *b)
     return bits_count((void *)set_difference(b, a)) == 0;
 }
 
-struct decomposed
-{
-    unsigned n;
-    unsigned vs[0];
-};
-
 void *set_decompose(const struct set *set)
 {
     const void *bits = set;
     const unsigned n = bits_count(bits);
-    struct decomposed *p = GC_MALLOC_ATOMIC(sizeof(struct decomposed) + sizeof(unsigned) * n);
-    p->n = n;
+    unsigned *const p = GC_MALLOC_ATOMIC(sizeof(unsigned) * (n + 1)); // (length, array)
+
+    unsigned *it = p;
+    *it++ = n;
     unsigned i = 0;
-    unsigned *it = p->vs;
-    while (it != p->vs + n)
+    while (it != p + n + 1)
     {
         while (!bits_get(bits, i))
             i += 1;
@@ -299,12 +294,12 @@ void *set_decompose(const struct set *set)
 
 unsigned decomposed_size(void *decomposed)
 {
-    return ((struct decomposed *)decomposed)->n;
+    return ((unsigned *)decomposed)[0];
 }
 
 unsigned *decomposed_array(void *decomposed)
 {
-    return ((struct decomposed *)decomposed)->vs;
+    return ((unsigned *)decomposed) + 1;
 }
 
 void *number_make(unsigned value)
