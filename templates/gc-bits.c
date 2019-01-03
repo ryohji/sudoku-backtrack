@@ -19,10 +19,15 @@ struct bits
     unsigned data[0];
 };
 
-struct bits *bits_make(unsigned nr_bits)
+struct bits *bits_make(unsigned nr_bits, const unsigned *index, unsigned elems)
 {
-    struct bits *bits = GC_MALLOC(sizeof(struct bits) + WSIZE * nr_word_for(nr_bits));
+    unsigned width = sizeof(struct bits) + WSIZE * nr_word_for(nr_bits);
+    struct bits *bits = GC_MALLOC_ATOMIC(width);
+    memset(bits, 0, width);
     bits->n = nr_bits;
+    const unsigned *it;
+    for (it = index; it != index + elems; it += 1)
+        bits->data[*it / NBITS] |= 1 << (*it % NBITS);
     return bits;
 }
 
@@ -31,30 +36,16 @@ unsigned bits_size(const struct bits *bits)
     return bits->n;
 }
 
-static void bits_set_(unsigned *bits, unsigned index, bool set);
-
 struct bits *bits_restore(const char *bitstring)
 {
-    struct bits *bits = bits_make(strlen(bitstring));
-    const char *it;
-    for (it = bitstring; it != bitstring + bits_size(bits); it += 1)
-    {
-        bits_set_(bits->data, it - bitstring, *it != '0');
-    }
-    return bits;
-}
-
-void bits_set_(unsigned *bits, unsigned index, bool set)
-{
-    div_t d = div(index, NBITS);
-    if (set)
-    {
-        bits[d.quot] |= 1 << d.rem;
-    }
-    else
-    {
-        bits[d.quot] &= ~(1 << d.rem);
-    }
+    const unsigned length = strlen(bitstring);
+    unsigned index[length];
+    unsigned *end = index;
+    const char *p;
+    for (p = bitstring; p != bitstring + length; p += 1)
+        if (*p != '0')
+            *end++ = p - bitstring;
+    return bits_make(length, index, end - index);
 }
 
 char *bits_serialize(const struct bits *bits)
@@ -71,16 +62,22 @@ char *bits_serialize(const struct bits *bits)
 
 struct bits *bits_set(const struct bits *bits, unsigned index, bool set)
 {
-    struct bits *copy = bits_make(bits->n);
+    struct bits *copy = bits_make(bits->n, NULL, 0);
     memcpy(copy->data, bits->data, WSIZE * nr_word_for(bits->n));
-    bits_set_(copy->data, index, set);
+    if (set)
+    {
+        copy->data[index / NBITS] |= 1 << (index % NBITS);
+    }
+    else
+    {
+        copy->data[index / NBITS] &= ~(1 << (index % NBITS));
+    }
     return copy;
 }
 
 bool bits_get(const struct bits *bits, unsigned index)
 {
-    div_t d = div(index, NBITS);
-    return bits->data[d.quot] & (1 << d.rem);
+    return bits->data[index / NBITS] & (1 << (index % NBITS));
 }
 
 static unsigned count(unsigned bits);
@@ -115,7 +112,7 @@ static void bits_mask_(unsigned *bits, unsigned nr_bits)
 
 struct bits *bits_not(const struct bits *original)
 {
-    struct bits *bits = bits_make(original->n);
+    struct bits *bits = bits_make(original->n, NULL, 0);
     unsigned *it;
     for (it = bits->data; it != bits->data + nr_word_for(bits->n); it += 1)
     {
@@ -128,7 +125,7 @@ struct bits *bits_not(const struct bits *original)
 
 struct bits *bits_or(const struct bits *a, const struct bits *b)
 {
-    struct bits *bits = bits_make(a->n);
+    struct bits *bits = bits_make(a->n, NULL, 0);
     unsigned *it;
     for (it = bits->data; it != bits->data + nr_word_for(bits->n); it += 1)
     {
@@ -141,7 +138,7 @@ struct bits *bits_or(const struct bits *a, const struct bits *b)
 
 struct bits *bits_and(const struct bits *a, const struct bits *b)
 {
-    struct bits *bits = bits_make(a->n);
+    struct bits *bits = bits_make(a->n, NULL, 0);
     unsigned *it;
     for (it = bits->data; it != bits->data + nr_word_for(bits->n); it += 1)
     {
@@ -154,7 +151,7 @@ struct bits *bits_and(const struct bits *a, const struct bits *b)
 
 struct bits *bits_xor(const struct bits *a, const struct bits *b)
 {
-    struct bits *bits = bits_make(a->n);
+    struct bits *bits = bits_make(a->n, NULL, 0);
     unsigned *it;
     for (it = bits->data; it != bits->data + nr_word_for(bits->n); it += 1)
     {

@@ -240,13 +240,7 @@ void *strip_having_intersectoin(void *target, void *value)
 // note: use `struct bits` as `struct set`.
 struct set *set_make(const unsigned *ns, unsigned elems)
 {
-    void *p = bits_make(81);
-    const unsigned *const end = ns + elems;
-    for (; ns != end; ns += 1)
-    {
-        p = bits_set(p, *ns, true);
-    }
-    return p;
+    return (void *)bits_make(81, ns, elems);
 }
 
 struct set *set_union(const struct set *a, const struct set *b)

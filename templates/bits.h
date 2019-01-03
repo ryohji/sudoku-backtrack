@@ -3,8 +3,8 @@
 
 struct bits;
 
-// construct bits holder
-struct bits *bits_make(unsigned nr_bits);
+// construct bits holder, and initialize bits set indicated by the array `index`.
+struct bits *bits_make(unsigned nr_bits, const unsigned *index, unsigned elems);
 
 unsigned bits_size(const struct bits *bits);
 
