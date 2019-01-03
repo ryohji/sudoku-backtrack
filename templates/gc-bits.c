@@ -103,66 +103,47 @@ unsigned count(unsigned bits)
     return (0x0000ffff & bits) + (0x0000ffff & (bits >> 16));
 }
 
-static void bits_mask_(unsigned *bits, unsigned nr_bits)
+struct bits *bits_eq(const struct bits *a, const struct bits *b)
 {
-    div_t d = div(nr_bits, NBITS);
-    unsigned mask = (1 << d.rem) - 1;
-    bits[d.quot] &= mask;
+    return bits_not(bits_xor(a, b));
 }
+
+#define FOR_EACH_WORD_OF(bits, value)                                           \
+    do                                                                          \
+    {                                                                           \
+        unsigned *it;                                                           \
+        for (it = bits->data; it != bits->data + nr_word_for(bits->n); it += 1) \
+        {                                                                       \
+            const unsigned distance = it - bits->data;                          \
+            *it = value;                                                        \
+        }                                                                       \
+        bits->data[bits->n / NBITS] &= (1 << (bits->n % NBITS)) - 1;            \
+    } while (0)
 
 struct bits *bits_not(const struct bits *original)
 {
     struct bits *bits = bits_make(original->n, NULL, 0);
-    unsigned *it;
-    for (it = bits->data; it != bits->data + nr_word_for(bits->n); it += 1)
-    {
-        unsigned distance = it - bits->data;
-        *it = ~original->data[distance];
-    }
-    bits_mask_(bits->data, bits->n);
+    FOR_EACH_WORD_OF(bits, (~original->data[distance]));
     return bits;
 }
 
 struct bits *bits_or(const struct bits *a, const struct bits *b)
 {
     struct bits *bits = bits_make(a->n, NULL, 0);
-    unsigned *it;
-    for (it = bits->data; it != bits->data + nr_word_for(bits->n); it += 1)
-    {
-        unsigned distance = it - bits->data;
-        *it = a->data[distance] | b->data[distance];
-    }
-    bits_mask_(bits->data, bits->n);
+    FOR_EACH_WORD_OF(bits, (a->data[distance] | b->data[distance]));
     return bits;
 }
 
 struct bits *bits_and(const struct bits *a, const struct bits *b)
 {
     struct bits *bits = bits_make(a->n, NULL, 0);
-    unsigned *it;
-    for (it = bits->data; it != bits->data + nr_word_for(bits->n); it += 1)
-    {
-        unsigned distance = it - bits->data;
-        *it = a->data[distance] & b->data[distance];
-    }
-    bits_mask_(bits->data, bits->n);
+    FOR_EACH_WORD_OF(bits, (a->data[distance] & b->data[distance]));
     return bits;
 }
 
 struct bits *bits_xor(const struct bits *a, const struct bits *b)
 {
     struct bits *bits = bits_make(a->n, NULL, 0);
-    unsigned *it;
-    for (it = bits->data; it != bits->data + nr_word_for(bits->n); it += 1)
-    {
-        unsigned distance = it - bits->data;
-        *it = a->data[distance] ^ b->data[distance];
-    }
-    bits_mask_(bits->data, bits->n);
+    FOR_EACH_WORD_OF(bits, (a->data[distance] ^ b->data[distance]));
     return bits;
-}
-
-struct bits *bits_eq(const struct bits *a, const struct bits *b)
-{
-    return bits_not(bits_xor(a, b));
 }
