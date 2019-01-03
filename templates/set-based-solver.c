@@ -8,7 +8,7 @@
 #include <stdlib.h>
 
 struct set;
-struct set *set_make(unsigned *ns, unsigned elems);
+struct set *set_make(const unsigned *ns, unsigned elems);
 struct set *set_union(const struct set *a, const struct set *b);
 struct set *set_difference(const struct set *a, const struct set *b);
 struct set *set_intersection(const struct set *a, const struct set *b);
@@ -20,7 +20,10 @@ void *set_decompose(const struct set *set);
 unsigned decomposed_size(void *decomposed);
 unsigned *decomposed_array(void *decomposed);
 
-struct list *fread_templates(FILE *fp);
+static const unsigned sudoku_template[][9] = {
+#include "sudoku.template"
+};
+struct list *templates_make(void);
 
 void *fput_string(void *context, void *value);
 struct list *solve(struct list *templates, const char *sudoku);
@@ -29,7 +32,7 @@ int main()
 {
     GC_INIT();
 
-    list_map(solve(fread_templates(stdin),
+    list_map(solve(templates_make(),
                    "*6*41*83*"
                    "7**8*****"
                    "5*19*****"
@@ -218,46 +221,30 @@ void *strip_having_intersectoin(void *target, void *value)
     return tagged_make(tagged_tag(value), list_filter(tagged_value(value), no_intersection, target));
 }
 
-struct set *fread_set(FILE *fp);
-
 struct array;
 struct array *array_make();
 unsigned array_size(struct array *array);
 void **array_values(struct array *array);
 void array_append(struct array *array, void *value);
 
-struct list *fread_templates(FILE *fp)
+struct list *templates_make(void)
 {
     struct array *array = array_make();
-    struct set *set;
-    while (!feof(fp) && (set = fread_set(fp)))
+    const unsigned *end = sudoku_template[0] + 9 * sizeof(sudoku_template) / sizeof(sudoku_template[0]);
+    const unsigned *it;
+    for (it = sudoku_template[0]; it != end; it += 9)
     {
-        array_append(array, set);
+        array_append(array, set_make(it, 9));
     }
 
     return list_make(array_values(array), array_size(array));
 }
 
-struct set *fread_set(FILE *fp)
-{
-    char buf[256];
-    if (fgets(buf, sizeof(buf), fp))
-    {
-        unsigned ns[9];
-        sscanf(buf, "%u %u %u %u %u %u %u %u %u", ns + 0, ns + 1, ns + 2, ns + 3, ns + 4, ns + 5, ns + 6, ns + 7, ns + 8);
-        return set_make(ns, 9);
-    }
-    else
-    {
-        return NULL;
-    }
-}
-
 // note: use `struct bits` as `struct set`.
-struct set *set_make(unsigned *ns, unsigned elems)
+struct set *set_make(const unsigned *ns, unsigned elems)
 {
     void *p = bits_make(81);
-    unsigned *const end = ns + elems;
+    const unsigned *const end = ns + elems;
     for (; ns != end; ns += 1)
     {
         p = bits_set(p, *ns, true);
