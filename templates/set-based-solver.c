@@ -20,20 +20,14 @@ void *set_decompose(const struct set *set);
 unsigned decomposed_size(void *decomposed);
 unsigned *decomposed_array(void *decomposed);
 
-static const unsigned sudoku_template[][9] = {
-#include "sudoku.template"
-};
-struct list *templates_make(void);
-
 void *fput_string(void *context, void *value);
-struct list *solve(struct list *templates, const char *sudoku);
+struct list *solve(const char *sudoku);
 
 int main()
 {
     GC_INIT();
 
-    list_map(solve(templates_make(),
-                   "*6*41*83*"
+    list_map(solve("*6*41*83*"
                    "7**8*****"
                    "5*19*****"
                    "*******7*"
@@ -57,6 +51,7 @@ void *fput_string(void *file, void *string)
 static struct list *convert_to_set(const char *sudoku);
 static void *union_fn(void *context, void *aggregate, void *value);
 static void *mk_candidates(void *context, void *placed);
+static struct list *templates_make(void);
 static void *zip_with_tag(void *context, void *aggregate, void *value);
 static void *solve_aux(void *context, void *value);
 static void *tagged_set_to_string(void *context, void *value);
@@ -65,11 +60,11 @@ static void *pair_make(void *first, void *second);
 static void *pair_1st(void *pair);
 static void *pair_2nd(void *pair);
 
-struct list *solve(struct list *templates, const char *sudoku)
+struct list *solve(const char *sudoku)
 {
     struct list *index = convert_to_set(sudoku);
     struct set *all = list_reduce(index, set_make(NULL, 0), union_fn, NULL);
-    struct list *candidates = list_map(index, mk_candidates, pair_make(templates, all));
+    struct list *candidates = list_map(index, mk_candidates, pair_make(templates_make(), all));
     struct list *tagged_candidates = list_reduce(candidates, list_make(NULL, 0), zip_with_tag, (unsigned[1]){0});
     struct list *results = solve_aux(NULL, pair_make(tagged_candidates, list_make(NULL, 0)));
     return list_map(results, tagged_set_to_string, NULL);
@@ -117,6 +112,28 @@ bool no_intersection(void *target, void *value)
     return set_subset(set_make(NULL, 0), set_intersection(target, value));
 }
 
+struct list *templates_make(void)
+{
+    static const unsigned sudoku_template[][9] = {
+#include "sudoku.template"
+    };
+    struct list *templates = list_make(NULL, 0);
+    void *buffer[8192];
+    void **p = buffer;
+    const unsigned *end = sudoku_template[0] + 9 * sizeof(sudoku_template) / sizeof(sudoku_template[0]);
+    const unsigned *it;
+    for (it = sudoku_template[0]; it != end; it += 9)
+    {
+        if (p == buffer + sizeof(buffer) / sizeof(buffer[0]))
+        {
+            templates = list_concatenate(templates, list_make(buffer, p - buffer));
+            p = buffer;
+        }
+        *p++ = set_make(it, 9);
+    }
+    return list_concatenate(templates, list_make(buffer, p - buffer));
+}
+
 static void *tagged_make(void *tag, void *value);
 static void *tagged_tag(void *tagged);
 static void *tagged_value(void *tagged);
@@ -139,8 +156,8 @@ void *solve_aux(void *context, void *value)
     void *to_be_fixed = pair_1st(value);
     void *fixed = pair_2nd(value);
     return list_length(to_be_fixed) == 0
-               ? list_make(&fixed, 1)                                                   // solved branch
-               : flatten(list_map(nexts_make(to_be_fixed, fixed), solve_aux, context)); // recursive search
+               ? list_make(&fixed, 1)                                                   // solved branch, or
+               : flatten(list_map(nexts_make(to_be_fixed, fixed), solve_aux, context)); // search recursively.
 }
 
 static void *forge_number(void *context, void *value);
@@ -165,14 +182,13 @@ void *forge_number(void *context, void *value)
     return NULL;
 }
 
+static void *choose(void *context, void *pair, void *value);
 static void *next_pair(void *context, void *candidate);
 
 struct triple
 {
     void *const tag, *const fixed, *const to_be_fixed;
 };
-
-static void *choose(void *context, void *pair, void *value);
 
 void *nexts_make(void *to_be_fixed, void *fixed)
 {
@@ -211,34 +227,14 @@ static void *strip_having_intersectoin(void *target, void *value);
 void *next_pair(void *context, void *candidate)
 {
     struct triple *const p = context;
-    void *const fixed = list_append(p->fixed, tagged_make(p->tag, candidate));
     void *const to_be_fixed = list_map(p->to_be_fixed, strip_having_intersectoin, candidate);
+    void *const fixed = list_append(p->fixed, tagged_make(p->tag, candidate));
     return pair_make(to_be_fixed, fixed);
 }
 
 void *strip_having_intersectoin(void *target, void *value)
 {
     return tagged_make(tagged_tag(value), list_filter(tagged_value(value), no_intersection, target));
-}
-
-struct list *templates_make(void)
-{
-    struct list *templates = list_make(NULL, 0);
-    void *buffer[8192];
-    void **p = buffer;
-    const unsigned *end = sudoku_template[0] + 9 * sizeof(sudoku_template) / sizeof(sudoku_template[0]);
-    const unsigned *it;
-    for (it = sudoku_template[0]; it != end; it += 9)
-    {
-        if (p == buffer + sizeof(buffer) / sizeof(buffer[0]))
-        {
-            templates = list_concatenate(templates, list_make(buffer, p - buffer));
-            p = buffer;
-        }
-        *p++ = set_make(it, 9);
-    }
-
-    return list_concatenate(templates, list_make(buffer, p - buffer));
 }
 
 // note: use `struct bits` as `struct set`.
