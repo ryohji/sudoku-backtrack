@@ -329,28 +329,22 @@ void *concat(void *context, void *aggregate, void *list)
     return list_concatenate(aggregate, list);
 }
 
-struct pair
-{
-    void *first;
-    void *second;
-};
-
 void *pair_make(void *first, void *second)
 {
-    struct pair *p = GC_MALLOC(sizeof(struct pair));
-    p->first = first;
-    p->second = second;
+    void **p = GC_MALLOC(sizeof(void *) * 2);
+    p[0] = first;
+    p[1] = second;
     return p;
 }
 
 void *pair_1st(void *pair)
 {
-    return ((struct pair *)pair)->first;
+    return ((void **)pair)[0];
 }
 
 void *pair_2nd(void *pair)
 {
-    return ((struct pair *)pair)->second;
+    return ((void **)pair)[1];
 }
 
 void *tagged_make(void *tag, void *value)
