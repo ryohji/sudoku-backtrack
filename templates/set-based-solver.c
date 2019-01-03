@@ -22,38 +22,113 @@ unsigned *decomposed_array(void *decomposed);
 
 struct list *fread_templates(FILE *fp);
 
-void solve(struct list *templates, const char *sudoku);
+void *fput_string(void *context, void *value);
+struct list *solve(struct list *templates, const char *sudoku);
 
 int main()
 {
     GC_INIT();
 
-    struct list *templates = fread_templates(stdin);
-
-    solve(templates, "*6*41*83*"
-                     "7**8*****"
-                     "5*19*****"
-                     "*******7*"
-                     "6*9***5*4"
-                     "*1*******"
-                     "*****47*9"
-                     "*****8**1"
-                     "*78*39*6*");
+    list_map(solve(fread_templates(stdin),
+                   "*6*41*83*"
+                   "7**8*****"
+                   "5*19*****"
+                   "*******7*"
+                   "6*9***5*4"
+                   "*1*******"
+                   "*****47*9"
+                   "*****8**1"
+                   "*78*39*6*"),
+             fput_string, stdout);
+    fflush(stdout);
 
     return 0;
 }
 
-static void *number_make(unsigned value);
-static unsigned as_number(void *value);
-static struct list *flatten(struct list *lists);
+void *fput_string(void *file, void *string)
+{
+    fputs(string, file);
+    return NULL;
+}
+
+static struct list *convert_to_set(const char *sudoku);
+static void *union_fn(void *context, void *aggregate, void *value);
+static void *mk_candidates(void *context, void *placed);
+static void *zip_with_tag(void *context, void *aggregate, void *value);
+static void *solve_aux(void *context, void *value);
+static void *tagged_set_to_string(void *context, void *value);
 
 static void *pair_make(void *first, void *second);
 static void *pair_1st(void *pair);
 static void *pair_2nd(void *pair);
+
+struct list *solve(struct list *templates, const char *sudoku)
+{
+    struct list *index = convert_to_set(sudoku);
+    struct set *all = list_reduce(index, set_make(NULL, 0), union_fn, NULL);
+    struct list *candidates = list_map(index, mk_candidates, pair_make(templates, all));
+    struct list *tagged_candidates = list_reduce(candidates, list_make(NULL, 0), zip_with_tag, (unsigned[1]){0});
+    struct list *results = solve_aux(NULL, pair_make(tagged_candidates, list_make(NULL, 0)));
+    return list_map(results, tagged_set_to_string, NULL);
+}
+
+struct list *convert_to_set(const char *sudoku)
+{
+    unsigned is[81]; // devide into 9 partition, to hold index for each number placed.
+    unsigned *end[9] = {is + 0, is + 9, is + 18, is + 27, is + 36, is + 45, is + 54, is + 63, is + 72};
+    const char *p;
+    for (p = sudoku; p != sudoku + 81; p += 1)
+    {
+        const unsigned n = *p - '1';
+        if (n < 9)
+            *end[n]++ = p - sudoku;
+    }
+#define S(n) set_make(is + 9 * n, end[n] - (is + 9 * n))
+    return list_make((void *[9]){S(0), S(1), S(2), S(3), S(4), S(5), S(6), S(7), S(8)}, 9);
+#undef S
+}
+
+void *union_fn(void *context, void *aggregate, void *value)
+{
+    return set_union(aggregate, value);
+}
+
+static bool subset(void *placed, void *template);
+static bool no_intersection(void *target, void *value);
+
+void *mk_candidates(void *context, void *placed)
+{
+    struct list *templates = pair_1st(context);
+    struct set *all = pair_2nd(context);
+    struct list *subsets = list_filter(templates, subset, placed);
+    return list_filter(subsets, no_intersection, set_difference(all, placed));
+}
+
+bool subset(void *placed, void *template)
+{
+    return set_subset(template, placed);
+}
+
+bool no_intersection(void *target, void *value)
+{
+    return set_subset(set_make(NULL, 0), set_intersection(target, value));
+}
+
 static void *tagged_make(void *tag, void *value);
 static void *tagged_tag(void *tagged);
 static void *tagged_value(void *tagged);
 
+static void *number_make(unsigned value);
+static unsigned as_number(void *value);
+
+void *zip_with_tag(void *context, void *aggregate, void *value)
+{
+    unsigned *p = context;
+    *p += 1;
+    return list_append(aggregate, tagged_make(number_make(*p), value));
+}
+
+static struct list *flatten(struct list *lists);
 static void *nexts_make(void *to_be_fixed, void *fixed);
 
 void *solve_aux(void *context, void *value)
@@ -63,6 +138,28 @@ void *solve_aux(void *context, void *value)
     return list_length(to_be_fixed) == 0
                ? list_make(&fixed, 1)                                                   // solved branch
                : flatten(list_map(nexts_make(to_be_fixed, fixed), solve_aux, context)); // recursive search
+}
+
+static void *forge_number(void *context, void *value);
+
+void *tagged_set_to_string(void *context, void *value)
+{
+    char *string = GC_MALLOC_ATOMIC(82);
+    string[81] = '\0';
+    list_map(value, forge_number, string);
+    return string;
+}
+
+void *forge_number(void *context, void *value)
+{
+    char *const string = context;
+    unsigned const n = as_number(tagged_tag(value));
+    void *const decomp = set_decompose(tagged_value(value));
+    unsigned *it = decomposed_array(decomp);
+    unsigned *const end = it + decomposed_size(decomp);
+    while (it != end)
+        string[*it++] = n + '0';
+    return NULL;
 }
 
 static void *next_pair(void *context, void *candidate);
@@ -116,106 +213,9 @@ void *next_pair(void *context, void *candidate)
     return pair_make(to_be_fixed, fixed);
 }
 
-static bool no_intersection(void *target, void *value);
-
 void *strip_having_intersectoin(void *target, void *value)
 {
     return tagged_make(tagged_tag(value), list_filter(tagged_value(value), no_intersection, target));
-}
-
-bool no_intersection(void *target, void *value)
-{
-    return set_subset(set_make(NULL, 0), set_intersection(target, value));
-}
-
-void *print_tagged(void *context, void *value)
-{
-    char *string = context;
-    unsigned const n = as_number(tagged_tag(value));
-    void *const decomp = set_decompose(tagged_value(value));
-    unsigned *it;
-    for (it = decomposed_array(decomp); it != decomposed_array(decomp) + decomposed_size(decomp); it += 1)
-    {
-        string[*it] = n + '0';
-    }
-    return NULL;
-}
-
-void *print_list_of_tagged(void *context, void *value)
-{
-    char *string = GC_MALLOC_ATOMIC(82);
-    string[81] = '\0';
-    list_map(value, print_tagged, string);
-    return string;
-}
-
-static void *union_fn(void *context, void *aggregate, void *value);
-static void *mk_candidates(void *context, void *placed);
-static void *zip_with_tag(void *context, void *aggregate, void *value);
-
-void solve(struct list *templates, const char *sudoku)
-{
-    unsigned is[81];
-    unsigned *pis[9] = {is + 0, is + 9, is + 18, is + 27, is + 36, is + 45, is + 54, is + 63, is + 72};
-    const char *p;
-    for (p = sudoku; p != sudoku + 81; p += 1)
-    {
-        unsigned n = *p - '1';
-        if (n < 9)
-        {
-            *pis[n] = p - sudoku;
-            pis[n] += 1;
-        }
-    }
-    void *ss[9] = {
-        set_make(is + 0, pis[0] - (is + 0)),
-        set_make(is + 9, pis[1] - (is + 9)),
-        set_make(is + 18, pis[2] - (is + 18)),
-        set_make(is + 27, pis[3] - (is + 27)),
-        set_make(is + 36, pis[4] - (is + 36)),
-        set_make(is + 45, pis[5] - (is + 45)),
-        set_make(is + 54, pis[6] - (is + 54)),
-        set_make(is + 63, pis[7] - (is + 63)),
-        set_make(is + 72, pis[8] - (is + 72)),
-    };
-    struct list *index = list_make(ss, 9);
-    struct set *all = list_reduce(index, set_make(NULL, 0), union_fn, NULL);
-    struct list *candidates = list_map(index, mk_candidates, pair_make(templates, all));
-    struct list *tagged_candidates = list_reduce(candidates, list_make(NULL, 0), zip_with_tag, (unsigned[1]){0});
-    struct list *results = solve_aux(NULL, pair_make(tagged_candidates, list_make(NULL, 0)));
-
-    struct list *strings = list_map(results, print_list_of_tagged, NULL);
-
-    puts(list_value(strings, 0)); // TODO
-
-    fflush(stdout);
-}
-
-void *union_fn(void *context, void *aggregate, void *value)
-{
-    return set_union(aggregate, value);
-}
-
-static bool subset(void *placed, void *template);
-
-void *mk_candidates(void *context, void *placed)
-{
-    struct list *templates = pair_1st(context);
-    struct set *all = pair_2nd(context);
-    struct list *subsets = list_filter(templates, subset, placed);
-    return list_filter(subsets, no_intersection, set_difference(all, placed));
-}
-
-bool subset(void *placed, void *template)
-{
-    return set_subset(template, placed);
-}
-
-void *zip_with_tag(void *context, void *aggregate, void *value)
-{
-    unsigned *p = context;
-    *p += 1;
-    return list_append(aggregate, tagged_make(number_make(*p), value));
 }
 
 struct set *fread_set(FILE *fp);
