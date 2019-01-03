@@ -221,23 +221,24 @@ void *strip_having_intersectoin(void *target, void *value)
     return tagged_make(tagged_tag(value), list_filter(tagged_value(value), no_intersection, target));
 }
 
-struct array;
-struct array *array_make();
-unsigned array_size(struct array *array);
-void **array_values(struct array *array);
-void array_append(struct array *array, void *value);
-
 struct list *templates_make(void)
 {
-    struct array *array = array_make();
+    struct list *templates = list_make(NULL, 0);
+    void *buffer[8192];
+    void **p = buffer;
     const unsigned *end = sudoku_template[0] + 9 * sizeof(sudoku_template) / sizeof(sudoku_template[0]);
     const unsigned *it;
     for (it = sudoku_template[0]; it != end; it += 9)
     {
-        array_append(array, set_make(it, 9));
+        if (p == buffer + sizeof(buffer) / sizeof(buffer[0]))
+        {
+            templates = list_concatenate(templates, list_make(buffer, p - buffer));
+            p = buffer;
+        }
+        *p++ = set_make(it, 9);
     }
 
-    return list_make(array_values(array), array_size(array));
+    return list_concatenate(templates, list_make(buffer, p - buffer));
 }
 
 // note: use `struct bits` as `struct set`.
@@ -304,40 +305,6 @@ unsigned decomposed_size(void *decomposed)
 unsigned *decomposed_array(void *decomposed)
 {
     return ((struct decomposed *)decomposed)->vs;
-}
-
-struct array
-{
-    unsigned caps;
-    unsigned n;
-    void **data;
-};
-
-struct array *array_make()
-{
-    return GC_MALLOC(sizeof(struct array));
-}
-
-unsigned array_size(struct array *array)
-{
-    return array->n;
-}
-
-void **array_values(struct array *array)
-{
-    return array->data;
-}
-
-void array_append(struct array *array, void *value)
-{
-    if (array->caps == array->n)
-    {
-        unsigned caps = array->caps ? array->caps * 2 : 16;
-        array->data = GC_REALLOC(array->data, caps * sizeof(void *));
-        array->caps = caps;
-    }
-    array->data[array->n] = value;
-    array->n += 1;
 }
 
 void *number_make(unsigned value)
