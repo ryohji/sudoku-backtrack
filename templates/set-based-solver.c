@@ -6,45 +6,63 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 struct set;
-struct set *set_make(const unsigned *ns, unsigned elems);
-struct set *set_union(const struct set *a, const struct set *b);
-struct set *set_difference(const struct set *a, const struct set *b);
-struct set *set_intersection(const struct set *a, const struct set *b);
+static struct set *set_make(const unsigned *ns, unsigned elems);
+static struct set *set_union(const struct set *a, const struct set *b);
+static struct set *set_difference(const struct set *a, const struct set *b);
+static struct set *set_intersection(const struct set *a, const struct set *b);
 // test if set B is the subset of set A.
-bool set_subset(const struct set *a, const struct set *b);
+static bool set_subset(const struct set *a, const struct set *b);
 
 // return the array object which having numbers in the specified set.
-void *set_decompose(const struct set *set);
-unsigned decomposed_size(void *decomposed);
-unsigned *decomposed_array(void *decomposed);
+static void *set_decompose(const struct set *set);
+static unsigned decomposed_size(void *decomposed);
+static unsigned *decomposed_array(void *decomposed);
 
-void *fput_string(void *context, void *value);
-struct list *solve(const char *sudoku);
+static const char *fread_sudoku(FILE *fp);
+
+static void *fput_string(void *context, void *value);
+static struct list *solve(const char *sudoku);
 
 int main()
 {
     GC_INIT();
-
-    list_map(solve("*6*41*83*"
-                   "7**8*****"
-                   "5*19*****"
-                   "*******7*"
-                   "6*9***5*4"
-                   "*1*******"
-                   "*****47*9"
-                   "*****8**1"
-                   "*78*39*6*"),
-             fput_string, stdout);
-    fflush(stdout);
-
+    list_map(solve(fread_sudoku(stdin)), fput_string, stdout);
     return 0;
+}
+
+const char *fread_sudoku(FILE *fp)
+{
+    char *const buffer = GC_MALLOC_ATOMIC(82);
+    memset(buffer, '\0', 82);
+
+    char *p = buffer, *q;
+    do
+        (p = fgets(p, (82 - (p - buffer)), fp)) && (q = strchr(p, '\n')) && (*q = '\0'), p && (p += strlen(p));
+    while (strlen(buffer) != 81 && !feof(fp) && !ferror(fp));
+
+    if (strlen(buffer) == 0)
+    {
+        strcpy(buffer, "*6*41*83*"
+                       "7**8*****"
+                       "5*19*****"
+                       "*******7*"
+                       "6*9***5*4"
+                       "*1*******"
+                       "*****47*9"
+                       "*****8**1"
+                       "*78*39*6*");
+        fprintf(stderr, "Solving sample; no sudoku read from stdin.\n");
+    }
+    puts(buffer);
+    return buffer;
 }
 
 void *fput_string(void *file, void *string)
 {
-    fputs(string, file);
+    fprintf(file, "%s\n", string);
     return NULL;
 }
 
