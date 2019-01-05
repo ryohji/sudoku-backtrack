@@ -90,18 +90,17 @@ struct list *solve(const char *sudoku)
 
 struct list *convert_to_set(const char *sudoku)
 {
-    unsigned is[81]; // devide into 9 partition, to hold index for each number placed.
-    unsigned *end[9] = {is + 0, is + 9, is + 18, is + 27, is + 36, is + 45, is + 54, is + 63, is + 72};
+    unsigned is[9 * 81]; // devide into 9 partition, to hold index for each number placed.
+#define B(n) (is + 81 * n)
+    unsigned *end[9] = {B(0), B(1), B(2), B(3), B(4), B(5), B(6), B(7), B(8)};
+    unsigned n;
     const char *p;
     for (p = sudoku; p != sudoku + 81; p += 1)
-    {
-        const unsigned n = *p - '1';
-        if (n < 9)
-            *end[n]++ = p - sudoku;
-    }
-#define S(n) set_make(is + 9 * n, end[n] - (is + 9 * n))
+        (n = *p - '1') < 9 && (*end[n]++ = p - sudoku);
+#define S(n) set_make(B(n), end[n] - B(n))
     return list_make((void *[9]){S(0), S(1), S(2), S(3), S(4), S(5), S(6), S(7), S(8)}, 9);
 #undef S
+#undef B
 }
 
 void *union_fn(void *context, void *aggregate, void *value)
