@@ -1,5 +1,7 @@
-#include "bits.h"
 #include "list.h"
+#include "set.h"
+#include "pair.h"
+#include "tagged.h"
 #include "gc.h"
 
 #include <stdbool.h>
@@ -7,19 +9,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
-struct set;
-static struct set *set_make(const unsigned *ns, unsigned elems);
-static struct set *set_union(const struct set *a, const struct set *b);
-static struct set *set_difference(const struct set *a, const struct set *b);
-static struct set *set_intersection(const struct set *a, const struct set *b);
-// test if set B is the subset of set A.
-static bool set_subset(const struct set *a, const struct set *b);
-
-// return the array object which having numbers in the specified set.
-static void *set_decompose(const struct set *set);
-static unsigned decomposed_size(void *decomposed);
-static unsigned *decomposed_array(void *decomposed);
 
 static const char *fread_sudoku(FILE *fp);
 
@@ -73,10 +62,6 @@ static struct list *templates_make(void);
 static void *zip_with_tag(void *context, void *aggregate, void *value);
 static void *solve_aux(void *context, void *value);
 static void *tagged_set_to_string(void *context, void *value);
-
-static void *pair_make(void *first, void *second);
-static void *pair_1st(void *pair);
-static void *pair_2nd(void *pair);
 
 struct list *solve(const char *sudoku)
 {
@@ -150,10 +135,6 @@ struct list *templates_make(void)
     }
     return list_concatenate(templates, list_make(buffer, p - buffer));
 }
-
-static void *tagged_make(void *tag, void *value);
-static void *tagged_tag(void *tagged);
-static void *tagged_value(void *tagged);
 
 static void *number_make(unsigned value);
 static unsigned as_number(void *value);
@@ -254,61 +235,6 @@ void *strip_having_intersectoin(void *target, void *value)
     return tagged_make(tagged_tag(value), list_filter(tagged_value(value), no_intersection, target));
 }
 
-// note: use `struct bits` as `struct set`.
-struct set *set_make(const unsigned *ns, unsigned elems)
-{
-    return (void *)bits_make(81, ns, elems);
-}
-
-struct set *set_union(const struct set *a, const struct set *b)
-{
-    return (void *)bits_or((const void *)a, (const void *)b);
-}
-
-struct set *set_intersection(const struct set *a, const struct set *b)
-{
-    return (void *)bits_and((const void *)a, (const void *)b);
-}
-
-struct set *set_difference(const struct set *a, const struct set *b)
-{
-    return set_intersection(a, (void *)bits_not((const void *)b));
-}
-
-// test if set B is the subset of set A.
-bool set_subset(const struct set *a, const struct set *b)
-{
-    return bits_count((void *)set_difference(b, a)) == 0;
-}
-
-void *set_decompose(const struct set *set)
-{
-    const void *bits = set;
-    const unsigned n = bits_count(bits);
-    unsigned *const p = GC_MALLOC_ATOMIC(sizeof(unsigned) * (n + 1)); // (length, array)
-
-    unsigned *it = p;
-    *it++ = n;
-    unsigned i = 0;
-    while (it != p + n + 1)
-    {
-        while (!bits_get(bits, i))
-            i += 1;
-        *it++ = i++;
-    }
-    return p;
-}
-
-unsigned decomposed_size(void *decomposed)
-{
-    return ((unsigned *)decomposed)[0];
-}
-
-unsigned *decomposed_array(void *decomposed)
-{
-    return ((unsigned *)decomposed) + 1;
-}
-
 void *number_make(unsigned value)
 {
     return (void *)(uintptr_t)value;
@@ -329,37 +255,4 @@ struct list *flatten(struct list *lists)
 void *concat(void *context, void *aggregate, void *list)
 {
     return list_concatenate(aggregate, list);
-}
-
-void *pair_make(void *first, void *second)
-{
-    void **p = GC_MALLOC(sizeof(void *) * 2);
-    p[0] = first;
-    p[1] = second;
-    return p;
-}
-
-void *pair_1st(void *pair)
-{
-    return ((void **)pair)[0];
-}
-
-void *pair_2nd(void *pair)
-{
-    return ((void **)pair)[1];
-}
-
-void *tagged_make(void *tag, void *value)
-{
-    return pair_make(tag, value);
-}
-
-void *tagged_tag(void *tagged)
-{
-    return pair_1st(tagged);
-}
-
-void *tagged_value(void *tagged)
-{
-    return pair_2nd(tagged);
 }
