@@ -12,13 +12,13 @@
 
 static const char *fread_sudoku(FILE *fp);
 
-static void *fput_string(void *context, void *value);
+static void *fput_string(void *context, void *aggregate, void *value);
 static struct list *solve(const char *sudoku);
 
 int main()
 {
     GC_INIT();
-    list_map(solve(fread_sudoku(stdin)), fput_string, stdout);
+    list_reduce(solve(fread_sudoku(stdin)), stdout, fput_string, NULL);
     return 0;
 }
 
@@ -49,10 +49,10 @@ const char *fread_sudoku(FILE *fp)
     return buffer;
 }
 
-void *fput_string(void *file, void *string)
+void *fput_string(void *context, void *file, void *string)
 {
     fprintf(file, "%s\n", string);
-    return NULL;
+    return file;
 }
 
 static struct list *convert_to_set(const char *sudoku);
@@ -68,7 +68,7 @@ struct list *solve(const char *sudoku)
     struct list *index = convert_to_set(sudoku);
     struct set *all = list_reduce(index, set_make(NULL, 0), union_fn, NULL);
     struct list *candidates = list_map(index, mk_candidates, pair_make(templates_make(), all));
-    struct list *tagged_candidates = list_reduce(candidates, list_make(NULL, 0), zip_with_tag, (unsigned[1]){0});
+    struct list *tagged_candidates = list_reduce(candidates, list_make(NULL, 0), zip_with_tag, (unsigned[1]){'0'});
     struct list *results = solve_aux(NULL, pair_make(tagged_candidates, list_make(NULL, 0)));
     return list_map(results, tagged_set_to_string, NULL);
 }
@@ -136,14 +136,24 @@ struct list *templates_make(void)
     return list_concatenate(templates, list_make(buffer, p - buffer));
 }
 
-static void *number_make(unsigned value);
-static unsigned as_number(void *value);
+static void *char_make(unsigned c);
+static char as_char(void *value);
 
 void *zip_with_tag(void *context, void *aggregate, void *value)
 {
     unsigned *p = context;
     *p += 1;
-    return list_append(aggregate, tagged_make(number_make(*p), value));
+    return list_append(aggregate, tagged_make(char_make(*p), value));
+}
+
+void *char_make(unsigned c)
+{
+    return (void *)(uintptr_t)c;
+}
+
+char as_char(void *value)
+{
+    return (uintptr_t)value;
 }
 
 static struct list *flatten(struct list *lists);
@@ -158,26 +168,24 @@ void *solve_aux(void *context, void *value)
                : flatten(list_map(nexts_make(to_be_fixed, fixed), solve_aux, context)); // search recursively.
 }
 
-static void *forge_number(void *context, void *value);
+static void *forge_number(void *context, void *aggregate, void *value);
 
 void *tagged_set_to_string(void *context, void *value)
 {
     char *string = GC_MALLOC_ATOMIC(82);
     string[81] = '\0';
-    list_map(value, forge_number, string);
-    return string;
+    return list_reduce(value, string, forge_number, NULL);
 }
 
-void *forge_number(void *context, void *value)
+void *forge_number(void *context, void *string, void *value)
 {
-    char *const string = context;
-    unsigned const n = as_number(tagged_tag(value));
-    void *const decomp = set_decompose(tagged_value(value));
+    char const c = as_char(tagged_tag(value));
+    struct set_decomposed *const decomp = set_decompose(tagged_value(value));
     unsigned *it = decomposed_array(decomp);
     unsigned *const end = it + decomposed_size(decomp);
     while (it != end)
-        string[*it++] = n + '0';
-    return NULL;
+        ((char *)string)[*it++] = c;
+    return string;
 }
 
 static void *choose(void *context, void *pair, void *value);
@@ -233,16 +241,6 @@ void *next_pair(void *context, void *candidate)
 void *strip_having_intersectoin(void *target, void *value)
 {
     return tagged_make(tagged_tag(value), list_filter(tagged_value(value), no_intersection, target));
-}
-
-void *number_make(unsigned value)
-{
-    return (void *)(uintptr_t)value;
-}
-
-unsigned as_number(void *value)
-{
-    return (uintptr_t)value;
 }
 
 static void *concat(void *context, void *aggregate, void *list);
