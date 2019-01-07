@@ -51,7 +51,7 @@ const char *fread_sudoku(FILE *fp)
 
 void *fput_string(void *context, void *file, void *string)
 {
-    fprintf(file, "%s\n", string);
+    fprintf(file, "%s\n", (char *)string);
     return file;
 }
 
